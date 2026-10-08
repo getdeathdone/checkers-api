@@ -81,7 +81,11 @@ function renderBoard() {
   const boardEl = document.getElementById("checkersBoard");
   boardEl.innerHTML = "";
 
-  document.getElementById("pdnInput").value = stateToPdn();
+  const currentPdn = stateToPdn();
+  document.getElementById("pdnInput").value = currentPdn;
+  try {
+    localStorage.setItem("checkers_saved_pdn", currentPdn);
+  } catch (e) {}
   updateTurnDisplay();
 
   for (let visualRow = 0; visualRow < 8; visualRow++) {
@@ -323,7 +327,12 @@ async function checkHealth() {
 
 // Event Listeners setup
 document.addEventListener("DOMContentLoaded", () => {
-  parsePdn(PRESETS.spec);
+  const savedPdn = localStorage.getItem("checkers_saved_pdn");
+  if (savedPdn && parsePdn(savedPdn)) {
+    // Restored existing game state
+  } else {
+    parsePdn(PRESETS.initial);
+  }
   renderBoard();
   checkHealth();
 
@@ -336,6 +345,9 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   document.getElementById("btnReset").addEventListener("click", () => {
+    try {
+      localStorage.removeItem("checkers_saved_pdn");
+    } catch (e) {}
     parsePdn(PRESETS.initial);
     highlightedSquares = [];
     renderBoard();
