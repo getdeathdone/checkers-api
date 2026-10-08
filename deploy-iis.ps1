@@ -65,11 +65,19 @@ try {
         $env:PATH = "C:\Program Files\dotnet;$env:PATH"
     }
 
-    # Stop IIS site if running to unlock published DLLs
+    # Stop IIS site and AppPool if running to unlock published DLLs (w3wp process lock)
     try {
         if (Get-Module -ListAvailable -Name WebAdministration) {
             Import-Module WebAdministration -ErrorAction SilentlyContinue
             Stop-Website -Name $SiteName -ErrorAction SilentlyContinue
+            Stop-WebAppPool -Name $AppPoolName -ErrorAction SilentlyContinue
+        }
+    } catch { }
+
+    # Ensure w3wp processes hosting the app are terminated to avoid MSB3026 file lock
+    try {
+        Get-Process -Name "w3wp" -ErrorAction SilentlyContinue | ForEach-Object {
+            try { Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue } catch { }
         }
     } catch { }
 
