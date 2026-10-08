@@ -1,0 +1,12 @@
+services:
+  checkers-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: checkers-api
+    ports:
+      - "5050:5050"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:5050
+    restart: unless-stopped

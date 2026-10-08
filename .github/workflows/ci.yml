@@ -1,0 +1,40 @@
+name: Checkers REST Web API CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: Build & Test (.NET 8)
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET 8 SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore Dependencies
+      run: dotnet restore CheckersApi.sln
+
+    - name: Build Solution (Release)
+      run: dotnet build CheckersApi.sln -c Release --no-restore
+
+    - name: Run Unit Tests (19 Tests)
+      run: dotnet test CheckersApi.sln -c Release --no-build --verbosity normal
+
+    - name: Publish Web API
+      run: dotnet publish src/CheckersApi.Web/CheckersApi.Web.csproj -c Release -o ./publish --nologo
+
+    - name: Upload Published Build Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: CheckersApi-Release
+        path: ./publish

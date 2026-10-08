@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Checkers REST Web API — Chinook / KingsRow</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header>
+    <div class="header-container">
+      <div class="logo">
+        <span class="icon">🏁</span>
+        <h1>Checkers API <span>Chinook / KingsRow</span></h1>
+      </div>
+      <div class="health-badge" id="healthBadge">
+        <span class="status-dot"></span>
+        <span id="healthText">Checking health...</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="board-column">
+      <div class="board-card">
+        <div class="board-header">
+          <div class="turn-indicator" id="turnIndicator">
+            Turn: <span id="currentTurnText" class="badge black">Black</span>
+          </div>
+          <div class="board-actions">
+            <button class="btn btn-sm" id="btnFlip" title="Flip Board">🔄 Flip</button>
+            <button class="btn btn-sm btn-outline" id="btnReset">Reset Initial</button>
+          </div>
+        </div>
+
+        <div class="board-wrapper">
+          <div id="checkersBoard" class="board"></div>
+        </div>
+
+        <div class="board-presets">
+          <label>Presets:</label>
+          <button class="btn btn-xs" data-preset="initial">Initial</button>
+          <button class="btn btn-xs" data-preset="spec">Spec Example (Midgame)</button>
+          <button class="btn btn-xs" data-preset="tablebase">Tablebase (<=8 pcs)</button>
+        </div>
+
+        <div class="pdn-box">
+          <label for="pdnInput">PDN Position:</label>
+          <div class="input-group">
+            <input type="text" id="pdnInput" value="B:W18,19,22,25,27,28,30,32:B1,5,6,7,10,12,14,16" />
+            <button class="btn btn-primary" id="btnLoadPdn">Load</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls-column">
+      <!-- Engine Control Card -->
+      <div class="card">
+        <h2>Engine Search Settings</h2>
+        
+        <div class="form-row">
+          <label for="levelSelect">Difficulty Level:</label>
+          <select id="levelSelect" class="form-control">
+            <option value="weak">Weak (100ms / Depth 8)</option>
+            <option value="medium" selected>Medium (250ms / Depth 12)</option>
+            <option value="strong">Strong (500-600ms / Depth 16 + Tablebase)</option>
+          </select>
+        </div>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="softTimeInput">Soft Time (ms):</label>
+            <input type="number" id="softTimeInput" class="form-control" value="250" />
+          </div>
+          <div class="form-group">
+            <label for="hardTimeInput">Hard Time (ms):</label>
+            <input type="number" id="hardTimeInput" class="form-control" value="1200" />
+          </div>
+          <div class="form-group">
+            <label for="maxDepthInput">Max Depth:</label>
+            <input type="number" id="maxDepthInput" class="form-control" value="12" />
+          </div>
+        </div>
+
+        <div class="action-buttons">
+          <button class="btn btn-success btn-lg" id="btnSuggest">
+            <span class="btn-icon">⚡</span> Get Best Move (POST /v1/move/suggest)
+          </button>
+        </div>
+
+        <div class="bot-play-box">
+          <label class="switch-container">
+            <input type="checkbox" id="autoBotToggle" />
+            <span class="slider"></span>
+            <span class="switch-label">Play vs Chinook (Auto reply when you move)</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Move Validation Card -->
+      <div class="card">
+        <h2>Move Validation (POST /v1/move/validate)</h2>
+        <div class="input-group">
+          <input type="text" id="validateMoveInput" placeholder="e.g. 10-15 or 22-18x11-7" />
+          <button class="btn btn-secondary" id="btnValidate">Validate Move</button>
+        </div>
+        <div id="validationResult" class="validation-result hidden"></div>
+      </div>
+
+      <!-- Engine Output Telemetry Card -->
+      <div class="card telemetry-card">
+        <h2>Engine Telemetry & Response</h2>
+        <div class="telemetry-grid">
+          <div class="telemetry-item">
+            <span class="telemetry-label">Best Move</span>
+            <span class="telemetry-value highlight" id="resBestMove">-</span>
+          </div>
+          <div class="telemetry-item">
+            <span class="telemetry-label">Response Time</span>
+            <span class="telemetry-value" id="resTime">-</span>
+          </div>
+          <div class="telemetry-item">
+            <span class="telemetry-label">Tablebase Hit</span>
+            <span class="telemetry-value" id="resTablebaseHit">-</span>
+          </div>
+          <div class="telemetry-item">
+            <span class="telemetry-label">Depth</span>
+            <span class="telemetry-value" id="resDepth">-</span>
+          </div>
+          <div class="telemetry-item">
+            <span class="telemetry-label">Nodes</span>
+            <span class="telemetry-value" id="resNodes">-</span>
+          </div>
+          <div class="telemetry-item">
+            <span class="telemetry-label">Score / WDL</span>
+            <span class="telemetry-value" id="resScore">-</span>
+          </div>
+        </div>
+
+        <div class="pv-box">
+          <span class="pv-label">Principal Variation (PV):</span>
+          <div class="pv-list" id="resPv">-</div>
+        </div>
+
+        <details class="json-details">
+          <summary>View Raw JSON Response</summary>
+          <pre id="rawJsonResponse">{}</pre>
+        </details>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>Checkers REST Web API &bull; Powered by Chinook 2–8 piece endgame databases &amp; KingsRow &bull; ASP.NET Core on IIS</p>
+    </div>
+  </footer>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
