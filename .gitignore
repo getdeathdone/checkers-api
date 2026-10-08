@@ -1,0 +1,21 @@
+# Build results
+[Bb]in/
+[Oo]bj/
+logs/
+*.log
+
+# Visual Studio / VS Code
+.vscode/
+.vs/
+*.user
+*.suo
+
+# OS generated
+.DS_Store
+Thumbs.db
+
+# Archives & Temporary files
+*.zip
+*.docx
+.local/
+Library/
