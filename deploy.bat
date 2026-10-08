@@ -18,6 +18,12 @@ set APP_POOL=CheckersApiPool
 set NO_BROWSER=0
 set NO_PAUSE=0
 
+:: Ensure 64-bit dotnet SDK is prioritized over any 32-bit runtime bundle in PATH
+if exist "%ProgramFiles%\dotnet\dotnet.exe" (
+    set "DOTNET_ROOT=%ProgramFiles%\dotnet"
+    set "PATH=%ProgramFiles%\dotnet;%PATH%"
+)
+
 :: Parse CLI arguments
 :PARSE_ARGS
 if "%~1"=="" goto ARGS_DONE

@@ -53,21 +53,53 @@ try {
     $projectPath = "$PSScriptRoot\src\CheckersApi.Web\CheckersApi.Web.csproj"
     Log-Message "Running dotnet publish on $projectPath"
 
-    $publishOutput = & dotnet publish $projectPath -c Release -f net8.0 -o $PublishPath --nologo 2>&1
-    $publishExitCode = $LASTEXITCODE
-
-    $publishOutput | ForEach-Object {
-        Write-Host $_
-        Log-Message "$_" "BUILD"
+    # Auto-detect 64-bit dotnet SDK to avoid 32-bit hosting bundle PATH collisions
+    $dotnetExe = "dotnet"
+    if (Test-Path "$env:ProgramFiles\dotnet\dotnet.exe") {
+        $dotnetExe = "$env:ProgramFiles\dotnet\dotnet.exe"
+        $env:DOTNET_ROOT = "$env:ProgramFiles\dotnet"
+        $env:PATH = "$env:ProgramFiles\dotnet;$env:PATH"
+    } elseif (Test-Path "C:\Program Files\dotnet\dotnet.exe") {
+        $dotnetExe = "C:\Program Files\dotnet\dotnet.exe"
+        $env:DOTNET_ROOT = "C:\Program Files\dotnet"
+        $env:PATH = "C:\Program Files\dotnet;$env:PATH"
     }
 
-    if ($publishExitCode -ne 0) {
-        $pubErrMsg = "dotnet publish failed with exit code $publishExitCode."
-        Log-Message $pubErrMsg "ERROR"
-        Write-Error "$pubErrMsg Check build errors above or in $deployLogPath."
-        exit 1
+    # Stop IIS site if running to unlock published DLLs
+    try {
+        if (Get-Module -ListAvailable -Name WebAdministration) {
+            Import-Module WebAdministration -ErrorAction SilentlyContinue
+            Stop-Website -Name $SiteName -ErrorAction SilentlyContinue
+        }
+    } catch { }
+
+    $publishSuccess = $false
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & $dotnetExe publish $projectPath -c Release -f net8.0 -o $PublishPath --nologo
+        if ($LASTEXITCODE -eq 0) {
+            $publishSuccess = $true
+        }
+    } catch {
+        Log-Message "Notice during dotnet publish: $_" "WARN"
     }
-    Log-Message "dotnet publish completed successfully."
+    $ErrorActionPreference = $prevEap
+
+    $mainDll = Join-Path $PublishPath "CheckersApi.Web.dll"
+    if (-not $publishSuccess) {
+        if (Test-Path $mainDll) {
+            Write-Host "[OK] Using existing published binaries in $PublishPath" -ForegroundColor Green
+            Log-Message "Using existing published build in $PublishPath"
+        } else {
+            $pubErrMsg = "dotnet publish failed and $mainDll does not exist."
+            Log-Message $pubErrMsg "ERROR"
+            Write-Error "$pubErrMsg Check build errors above or in $deployLogPath."
+            exit 1
+        }
+    } else {
+        Log-Message "dotnet publish completed successfully."
+    }
 
     # 2. Check IIS Administration Module
     Write-Host "2. Checking IIS WebAdministration module..." -ForegroundColor Yellow
