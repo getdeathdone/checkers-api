@@ -151,8 +151,14 @@ try {
 
     # Stop any conflicting websites on the target port (e.g., Default Web Site on port 80)
     try {
+        if (Test-Path "IIS:\Sites\Default Web Site") {
+            Write-Host "Stopping 'Default Web Site' to free port $Port..." -ForegroundColor Yellow
+            Stop-Website -Name "Default Web Site" -ErrorAction SilentlyContinue
+            Set-ItemProperty "IIS:\Sites\Default Web Site" -Name "serverAutoStart" -Value $false -ErrorAction SilentlyContinue
+        }
+        $targetPortPattern = "*:$($Port):*"
         Get-Website | Where-Object { 
-            $_.Name -ne $SiteName -and ($_.Bindings.Collection.bindingInformation -like "*:$Port:*")
+            $_.Name -ne $SiteName -and ($_.Bindings.Collection.bindingInformation -like $targetPortPattern)
         } | ForEach-Object {
             Write-Host "Stopping conflicting website '$($_.Name)' on port $Port..." -ForegroundColor Yellow
             Log-Message "Stopping conflicting website '$($_.Name)' on port $Port"
