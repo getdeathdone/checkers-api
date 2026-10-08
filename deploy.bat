@@ -129,12 +129,11 @@ if !errorLevel! equ 0 goto IIS_ADMIN_OK
 
 echo [WARNING] Administrator privileges are required to configure IIS.
 call :LOG "Requesting UAC elevation to Administrator..."
-echo Elevating privileges to Administrator...
-set ARGS_PASSTHROUGH=--mode iis --port %PORT% --path "%PUBLISH_PATH%" --site-name "%SITE_NAME%" --app-pool "%APP_POOL%"
+set ARGS_PASSTHROUGH=--mode iis --port %PORT% --path %PUBLISH_PATH% --site-name %SITE_NAME% --app-pool %APP_POOL%
 if %NO_BROWSER% equ 1 set ARGS_PASSTHROUGH=!ARGS_PASSTHROUGH! --no-browser
 if %NO_PAUSE% equ 1 set ARGS_PASSTHROUGH=!ARGS_PASSTHROUGH! --no-pause
 
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process cmd.exe -ArgumentList '/k \"\"%~f0\" !ARGS_PASSTHROUGH!\"' -Verb RunAs"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%~f0' -ArgumentList '!ARGS_PASSTHROUGH!' -Verb RunAs"
 exit /b
 
 :IIS_ADMIN_OK
@@ -350,7 +349,7 @@ if !errorLevel! equ 0 goto BUNDLE_IS_ADMIN
 
 echo Elevating privileges to Administrator...
 call :LOG "Elevating for hosting bundle install..."
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process cmd.exe -ArgumentList '/k \"\"%~f0\" --mode install-bundle\"' -Verb RunAs"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%~f0' -ArgumentList '--mode install-bundle' -Verb RunAs"
 exit /b
 
 :BUNDLE_IS_ADMIN
