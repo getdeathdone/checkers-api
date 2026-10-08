@@ -149,27 +149,33 @@ try {
     Set-ItemProperty "IIS:\AppPools\$AppPoolName" -Name "managedRuntimeVersion" -Value ""
     Set-ItemProperty "IIS:\AppPools\$AppPoolName" -Name "processModel.identityType" -Value "ApplicationPoolIdentity"
 
-    # 5. Create or Update Web Site
-    Write-Host "5. Configuring IIS Web Site '$SiteName' on port $Port..." -ForegroundColor Yellow
-    Log-Message "Configuring Website: $SiteName on port $Port with path $PublishPath"
-    if (Test-Path "IIS:\Sites\$SiteName") {
-        Stop-Website -Name $SiteName -ErrorAction SilentlyContinue
-        Set-ItemProperty "IIS:\Sites\$SiteName" -Name "physicalPath" -Value $PublishPath
-        Log-Message "Updated existing Website: $SiteName"
-    } else {
-        New-Website -Name $SiteName -Port $Port -PhysicalPath $PublishPath -ApplicationPool $AppPoolName
-        Log-Message "Created new Website: $SiteName"
+    # Stop any conflicting websites on the target port (e.g., Default Web Site on port 80)
+    try {
+        Get-Website | Where-Object { 
+            $_.Name -ne $SiteName -and ($_.Bindings.Collection.bindingInformation -like "*:$Port:*")
+        } | ForEach-Object {
+            Write-Host "Stopping conflicting website '$($_.Name)' on port $Port..." -ForegroundColor Yellow
+            Log-Message "Stopping conflicting website '$($_.Name)' on port $Port"
+            Stop-Website -Name $_.Name -ErrorAction SilentlyContinue
+            Set-ItemProperty "IIS:\Sites\$($_.Name)" -Name "serverAutoStart" -Value $false -ErrorAction SilentlyContinue
+        }
+    } catch {
+        Log-Message "Note during conflicting site check: $_" "WARN"
     }
-    Start-Website -Name $SiteName
-    Log-Message "Started Website: $SiteName"
 
-    # 6. Set NTFS Permissions for AppPool and logs
-    Write-Host "6. Setting filesystem permissions for IIS AppPool and logs..." -ForegroundColor Yellow
-    $acl = Get-Acl $PublishPath
-    $rule = New-Object System.Security.AccessControl.FileSystemAccessRule("IIS AppPool\$AppPoolName", "ReadAndExecute", "ContainerInherit,ObjectInherit", "None", "Allow")
-    $acl.AddAccessRule($rule)
-    Set-Acl $PublishPath $acl
-    Log-Message "Granted ReadAndExecute permissions on $PublishPath to IIS AppPool\$AppPoolName"
+    # 5. Set NTFS Permissions for AppPool, IIS_IUSRS and logs
+    Write-Host "5. Setting filesystem permissions for IIS AppPool and logs..." -ForegroundColor Yellow
+    try {
+        $acl = Get-Acl $PublishPath
+        $rule = New-Object System.Security.AccessControl.FileSystemAccessRule("IIS AppPool\$AppPoolName", "ReadAndExecute", "ContainerInherit,ObjectInherit", "None", "Allow")
+        $acl.AddAccessRule($rule)
+        $ruleIisUsers = New-Object System.Security.AccessControl.FileSystemAccessRule("BUILTIN\IIS_IUSRS", "ReadAndExecute", "ContainerInherit,ObjectInherit", "None", "Allow")
+        $acl.AddAccessRule($ruleIisUsers)
+        Set-Acl $PublishPath $acl
+        Log-Message "Granted ReadAndExecute permissions on $PublishPath to IIS AppPool\$AppPoolName and BUILTIN\IIS_IUSRS"
+    } catch {
+        Log-Message "Warning updating ACL on $PublishPath. Details: $_" "WARN"
+    }
 
     # Ensure logs directory exists in publish folder and has full write permissions
     $logsPath = Join-Path $PublishPath "logs"
@@ -191,6 +197,21 @@ try {
         Log-Message "Warning updating ACL on $logsPath. Details: $_" "WARN"
         Write-Warning "Could not update ACL on $logsPath. Details: $_"
     }
+
+    # 6. Create or Update Web Site
+    Write-Host "6. Configuring IIS Web Site '$SiteName' on port $Port..." -ForegroundColor Yellow
+    Log-Message "Configuring Website: $SiteName on port $Port with path $PublishPath"
+    if (Test-Path "IIS:\Sites\$SiteName") {
+        Stop-Website -Name $SiteName -ErrorAction SilentlyContinue
+        Set-ItemProperty "IIS:\Sites\$SiteName" -Name "physicalPath" -Value $PublishPath
+        Set-ItemProperty "IIS:\Sites\$SiteName" -Name "applicationPool" -Value $AppPoolName
+        Log-Message "Updated existing Website: $SiteName"
+    } else {
+        New-Website -Name $SiteName -Port $Port -PhysicalPath $PublishPath -ApplicationPool $AppPoolName
+        Log-Message "Created new Website: $SiteName"
+    }
+    Start-Website -Name $SiteName
+    Log-Message "Started Website: $SiteName"
 
     # 7. Health Check Verification
     Write-Host "7. Verifying application health..." -ForegroundColor Yellow
